@@ -4,6 +4,7 @@ const cors = require('cors')
 require('dotenv').config()
 const port = process.env.PORT || 5000
 const app = express()
+app.use(express.json())
 app.use(cors({
     origin: ["http://localhost:5173"]
 }))
@@ -34,7 +35,20 @@ async function run() {
         })
         app.get('/foodCount', async (req, res) => {
             const count = await foodCollection.estimatedDocumentCount()
-            res.send({count})
+            res.send({ count })
+        })
+        app.get('/foods', async (req, res) => {
+            const page = parseInt(req.query.page)
+            const size = parseInt(req.query.size)
+            const result = await foodCollection.find()
+                .skip(page * size).limit(size).toArray()
+            res.send(result);
+        })
+        app.get('/search', async (req, res) => {
+            const search = req.query.searchText
+            const query = foodCollection.find({ food_name: { $regex: `${search}` } })
+            const result = await query.toArray()
+            res.send(result);
         })
 
     } finally {
