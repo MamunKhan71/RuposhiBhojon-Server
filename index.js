@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require('mongodb')
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const express = require('express')
 const cors = require('cors')
 require('dotenv').config()
@@ -28,6 +28,7 @@ async function run() {
         const database = client.db('RuposhiBhojon')
         const foodCollection = database.collection('foods')
 
+        // get requests
         app.get('/featured', async (req, res) => {
             const cursor = foodCollection.find().sort({ food_quantity: -1 }).limit(6)
             const result = await cursor.toArray()
@@ -45,11 +46,25 @@ async function run() {
             res.send(result);
         })
         app.get('/search', async (req, res) => {
-            const search = req.query.searchText
-            const query = foodCollection.find({ food_name: { $regex: `${search}` } })
+            const search = req.query.search
+            const query = foodCollection.find({ food_name: { $regex: `${search}`, $options: 'i' } })
             const result = await query.toArray()
             res.send(result);
         })
+        app.get('/food/:id', async (req, res) => {
+            const query = { _id: new ObjectId(req.params.id) }
+            const result = await foodCollection.findOne(query)
+            res.send(result)
+        })
+
+        // post requests 
+        app.post('/add-food', async (req, res) => {
+            const data = req.body
+            const result = await foodCollection.insertOne(data)
+            res.send(result)
+        })
+
+
 
     } finally {
 
