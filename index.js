@@ -128,6 +128,16 @@ async function run() {
             res.send(result)
         })
 
+        // my requests
+        app.get('/my-requests', async (req, res) => {
+            const id = req.query.user
+            console.log(id);
+            const query = { "user.user_id": id }
+            const cursor = foodRequestCollection.find(query)
+            const result = await cursor.toArray()
+            res.send(result)
+        })
+
 
     } finally {
 
