@@ -27,7 +27,7 @@ async function run() {
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
         const database = client.db('RuposhiBhojon')
         const foodCollection = database.collection('foods')
-
+        const foodRequestCollection = database.collection('requests')
         // get requests
         app.get('/featured', async (req, res) => {
             const cursor = foodCollection.find().sort({ food_quantity: -1 }).limit(6)
@@ -56,6 +56,14 @@ async function run() {
             const result = await foodCollection.findOne(query)
             res.send(result)
         })
+        app.get('/my-food', async (req, res) => {
+            const query = {
+                "donator.uid": req.query.user
+            };
+            const cursor = foodCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result);
+        });
 
         // post requests 
         app.post('/add-food', async (req, res) => {
@@ -63,7 +71,62 @@ async function run() {
             const result = await foodCollection.insertOne(data)
             res.send(result)
         })
+        app.post('/food-request', async (req, res) => {
+            const data = req.body
+            const result = await foodRequestCollection.insertOne(data)
+            res.send(result)
+        })
 
+        // sort request
+        app.get('/time-sort', async (req, res) => {
+            const itemsPerPage = parseInt(req.query.itemsPerPage)
+            const currentPage = parseInt(req.query.currentPage)
+            const filter = req.query.filter
+            let cursor = null
+            if (filter === 'time') {
+                cursor = foodCollection.find().sort({ expired_datetime: -1 })
+            } else if (filter === 'quantity') {
+                cursor = foodCollection.find().sort({ food_quantity: -1 })
+            }
+            const result = await cursor.skip(currentPage * itemsPerPage).limit(itemsPerPage).toArray()
+            res.send(result)
+        })
+
+        // patch request
+        app.patch('/update-food', async (req, res) => {
+            const data = req.body;
+            const paramData = req.query?.statusUpdate
+            const query = { _id: new ObjectId(data._id) };
+            let updateFoodItem = {}
+            if (paramData) {
+                updateFoodItem = {
+                    availability: data?.available,
+                }
+            } else {
+                updateFoodItem = {
+                    food_name: data.foodName,
+                    food_image: data.foodImage,
+                    food_quantity: data.foodQty,
+                    expired_datetime: data.expiryDate,
+                    pickup_location: data.pickup,
+                    availability: data.available,
+                    additional_notes: data.notes,
+                }
+            }
+            console.log(updateFoodItem);
+            console.log(data._id);
+            const update = { $set: updateFoodItem };
+            const result = await foodCollection.updateOne(query, update);
+            res.send(result);
+        });
+
+
+        // delete request
+        app.delete('/delete-food/:id', async (req, res) => {
+            const id = req.params.id
+            const result = await foodCollection.deleteOne({ _id: new ObjectId(id) })
+            res.send(result)
+        })
 
 
     } finally {
