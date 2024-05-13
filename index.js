@@ -30,25 +30,29 @@ async function run() {
         const foodRequestCollection = database.collection('requests')
         // get requests
         app.get('/featured', async (req, res) => {
-            const cursor = foodCollection.find().sort({ food_quantity: -1 }).limit(6)
+            const query = { availability: { $ne: "Reserved" } };
+            const cursor = foodCollection.find(query).sort({ food_quantity: -1 }).limit(6)
             const result = await cursor.toArray()
             res.send(result)
         })
         app.get('/foodCount', async (req, res) => {
-            const count = await foodCollection.estimatedDocumentCount()
+            const count = await foodCollection.countDocuments({ availability: { $ne: "Reserved" } });
             res.send({ count })
         })
         app.get('/foods', async (req, res) => {
             const page = parseInt(req.query.page)
             const size = parseInt(req.query.size)
-            const result = await foodCollection.find()
-                .skip(page * size).limit(size).toArray()
+            const query = { availability: { $ne: "Reserved" } };
+            const result = await foodCollection.find(query)
+                .skip(page * size).limit(size).toArray();
             res.send(result);
         })
         app.get('/search', async (req, res) => {
             const search = req.query.search
-            const query = foodCollection.find({ food_name: { $regex: `${search}`, $options: 'i' } })
-            const result = await query.toArray()
+            console.log(search);
+            const queryParams = { availability: { $ne: "Reserved" }, food_name: { $regex: `${search}`, $options: 'i' } };
+            const query = foodCollection.find(queryParams);
+            const result = await query.toArray();
             res.send(result);
         })
         app.get('/food/:id', async (req, res) => {
@@ -82,11 +86,13 @@ async function run() {
             const itemsPerPage = parseInt(req.query.itemsPerPage)
             const currentPage = parseInt(req.query.currentPage)
             const filter = req.query.filter
+            const queryParams = { availability: { $ne: "Reserved" } };
+
             let cursor = null
             if (filter === 'time') {
-                cursor = foodCollection.find().sort({ expired_datetime: -1 })
+                cursor = foodCollection.find(queryParams).sort({ expired_datetime: -1 })
             } else if (filter === 'quantity') {
-                cursor = foodCollection.find().sort({ food_quantity: -1 })
+                cursor = foodCollection.find(queryParams).sort({ food_quantity: -1 })
             }
             const result = await cursor.skip(currentPage * itemsPerPage).limit(itemsPerPage).toArray()
             res.send(result)
@@ -135,6 +141,12 @@ async function run() {
             const query = { "user.user_id": id }
             const cursor = foodRequestCollection.find(query)
             const result = await cursor.toArray()
+            res.send(result)
+        })
+
+        app.delete('/delete-request', async (req, res) => {
+            const id = req.query.id
+            const result = await foodRequestCollection.deleteOne({ _id: new ObjectId(id) })
             res.send(result)
         })
 
