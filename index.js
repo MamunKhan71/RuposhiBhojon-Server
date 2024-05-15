@@ -42,7 +42,6 @@ async function run() {
     try {
         await client.connect();
         await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
         const database = client.db('RuposhiBhojon')
         const foodCollection = database.collection('foods')
         const foodRequestCollection = database.collection('requests')
@@ -80,7 +79,7 @@ async function run() {
             res.send(result)
         })
         app.get('/foodCount', async (req, res) => {
-            const count = await foodCollection.countDocuments({ availability: { $ne: "Reserved" } });
+            const count = await foodCollection.countDocuments({ availability: { $nin: ["Reserved", "Not Available"] } });
             res.send({ count })
         })
         app.get('/foods', async (req, res) => {
@@ -93,8 +92,7 @@ async function run() {
         })
         app.get('/search', async (req, res) => {
             const search = req.query.search
-            console.log(search);
-            const queryParams = { availability: { $ne: "Reserved" }, food_name: { $regex: `${search}`, $options: 'i' } };
+            const queryParams = { availability: { $nin: ["Reserved", "Not Available"] }, food_name: { $regex: `${search}`, $options: 'i' } };
             const query = foodCollection.find(queryParams);
             const result = await query.toArray();
             res.send(result);
@@ -105,8 +103,6 @@ async function run() {
             res.send(result)
         })
         app.get('/my-food', verifyToken, async (req, res) => {
-            console.log(req.user);
-            console.log(req.query.user);
             if (req.query.user !== req.user.email) {
                 res.status(403).send({ message: "Forbidden Access!" })
             } else {
