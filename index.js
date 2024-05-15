@@ -28,6 +28,12 @@ async function run() {
         const database = client.db('RuposhiBhojon')
         const foodCollection = database.collection('foods')
         const foodRequestCollection = database.collection('requests')
+        const userCollection = database.collection('users')
+        app.post('/user', async (req, res) => {
+            const user = req.body
+            const result = await userCollection.insertOne(user)
+            res.send(result)
+        })
         // get requests
         app.get('/featured', async (req, res) => {
             const query = { availability: { $ne: "Reserved" } };
@@ -42,7 +48,7 @@ async function run() {
         app.get('/foods', async (req, res) => {
             const page = parseInt(req.query.page)
             const size = parseInt(req.query.size)
-            const query = { availability: { $ne: "Reserved" } };
+            const query = { availability: { $nin: ["Reserved", "Not Available"] } };
             const result = await foodCollection.find(query)
                 .skip(page * size).limit(size).toArray();
             res.send(result);
