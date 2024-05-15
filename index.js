@@ -1,17 +1,20 @@
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const express = require('express')
+const cookieParser = require('cookie-parser')
 const cors = require('cors')
 require('dotenv').config()
+const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 5000
 const app = express()
+app.use(cookieParser())
 app.use(express.json())
 app.use(cors({
-    origin: ["http://localhost:5173"]
+    origin: ["http://localhost:5173"],
+    credentials: true,
 }))
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.q3zjxg2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -19,6 +22,21 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
+
+
+const verifyToken = (req, res, next) => {
+    const token = (req.cookies?.token);
+    if (!token) {
+        return res.status(401).send({ message: "Unauthorized Access!" })
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+        if (error) {
+            return res.status(401).send({ message: "Unauthorized Access!" })
+        }
+        req.user = decoded
+        next()
+    })
+}
 
 async function run() {
     try {
@@ -29,6 +47,26 @@ async function run() {
         const foodCollection = database.collection('foods')
         const foodRequestCollection = database.collection('requests')
         const userCollection = database.collection('users')
+
+
+        app.post('/jwt', async (req, res) => {
+            const user = req.body
+            const token = jwt.sign(
+                user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' }
+            )
+            res
+                .cookie('token', token, {
+                    httpOnly: true,
+                    secure: true,
+                    sameSite: 'none',
+                })
+                .send({ success: true })
+
+        })
+        app.post('/logout', async (req, res) => {
+            const user = req.body
+            res.clearCookie('token', { maxAge: 0 }).send({ success: true })
+        })
         app.post('/user', async (req, res) => {
             const user = req.body
             const result = await userCollection.insertOne(user)
@@ -66,13 +104,19 @@ async function run() {
             const result = await foodCollection.findOne(query)
             res.send(result)
         })
-        app.get('/my-food', async (req, res) => {
-            const query = {
-                "donator.uid": req.query.user
-            };
-            const cursor = foodCollection.find(query);
-            const result = await cursor.toArray();
-            res.send(result);
+        app.get('/my-food', verifyToken, async (req, res) => {
+            console.log(req.user);
+            console.log(req.query.user);
+            if (req.query.user !== req.user.email) {
+                res.status(403).send({ message: "Forbidden Access!" })
+            } else {
+                const query = {
+                    "donator.userEmail": req.query.user
+                };
+                const cursor = foodCollection.find(query);
+                const result = await cursor.toArray();
+                res.send(result);
+            }
         });
 
         // post requests 
@@ -125,8 +169,6 @@ async function run() {
                     additional_notes: data.notes,
                 }
             }
-            console.log(updateFoodItem);
-            console.log(data._id);
             const update = { $set: updateFoodItem };
             const result = await foodCollection.updateOne(query, update);
             res.send(result);
@@ -141,13 +183,18 @@ async function run() {
         })
 
         // my requests
-        app.get('/my-requests', async (req, res) => {
-            const id = req.query.user
-            console.log(id);
-            const query = { "user.user_id": id }
-            const cursor = foodRequestCollection.find(query)
-            const result = await cursor.toArray()
-            res.send(result)
+        app.get('/my-requests', verifyToken, async (req, res) => {
+            const reqEmail = req.query.user
+            const tokenEmail = req.user
+            if (reqEmail !== tokenEmail.email) {
+                res.status(403).send({ message: "Forbidden Access!" })
+            } else {
+                const query = { "user.user_email": reqEmail }
+                const cursor = foodRequestCollection.find(query)
+                const result = await cursor.toArray()
+                res.send(result)
+            }
+
         })
 
         app.delete('/delete-request', async (req, res) => {
